@@ -551,6 +551,28 @@
         });
       });
 
+      // 清空表單函數
+      function resetUploadForm() {
+        // 清空區域選擇
+        document.getElementById('area').value = '';
+        // 保留主管姓名（通常同一 session 是同一個主管）
+        // 如需完全清空，可取消下面這行的註解
+        // document.getElementById('supervisor').value = '';
+        
+        // 清空照片
+        photos[1] = photos[2] = null;
+        document.querySelectorAll('.photo-box img').forEach(function(i) {
+          i.src = '';
+          i.style.display = 'none';
+        });
+        document.querySelectorAll('.photo-box .placeholder').forEach(function(p) {
+          p.style.display = 'block';
+        });
+        document.querySelectorAll('.photo-box input').forEach(function(i) {
+          i.value = '';
+        });
+      }
+
       document.getElementById('btnUpload').addEventListener('click', function() {
         var area = document.getElementById('area').value;
         var supervisor = document.getElementById('supervisor').value.trim();
@@ -559,13 +581,25 @@
         if (!GAS_APP_URL || GAS_APP_URL.indexOf('XXXXXXXX') >= 0) { showToast('請先在 index.html 中設定 GAS_APP_URL', 'error'); return; }
 
         var btn = this;
+        var savedArea = area; // 保存用於顯示結果
+        var savedSupervisor = supervisor; // 保存用於顯示結果
+        
+        // 先保存照片資料（因為要立即清空表單）
+        var photo1Base64 = photos[1];
+        var photo2Base64 = photos[2];
+        
         btn.disabled = true;
-        btn.textContent = '分析中…';
+        btn.textContent = '上傳中…';
         document.getElementById('uploadResult').style.display = 'none';
 
-        callUpload({ area: area, supervisor: supervisor, photo1Base64: photos[1], photo2Base64: photos[2] }).then(function(res) {
-          btn.disabled = false;
-          btn.textContent = '上傳並取得 AI 分析';
+        // 立即清空表單，讓用戶可以開始下一個區域的作業
+        resetUploadForm();
+        btn.disabled = false;
+        btn.textContent = '上傳並取得 AI 分析';
+        showToast('已上傳，分析中…');
+
+        // 發送上傳請求（異步處理）
+        callUpload({ area: savedArea, supervisor: savedSupervisor, photo1Base64: photo1Base64, photo2Base64: photo2Base64 }).then(function(res) {
           if (res.success) {
             var html = '';
             html += '<div class="score-badge safety">環境安全度 ' + (res.safetyScore != null ? res.safetyScore : '–') + '</div>';
@@ -573,17 +607,11 @@
             html += '<div class="record-item"><div class="feedback">' + (res.feedback || res.summary || '').replace(/\n/g, '<br>') + '</div></div>';
             document.getElementById('uploadFeedback').innerHTML = html;
             document.getElementById('uploadResult').style.display = 'block';
-            showToast('上傳成功');
-            photos[1] = photos[2] = null;
-            document.querySelectorAll('.photo-box img').forEach(function(i) { i.src = ''; i.style.display = 'none'; });
-            document.querySelectorAll('.photo-box .placeholder').forEach(function(p) { p.style.display = 'block'; });
-            document.querySelectorAll('.photo-box input').forEach(function(i) { i.value = ''; });
+            showToast('分析完成：廠區 ' + savedArea);
           } else {
             showToast(res.error || '上傳失敗', 'error');
           }
         }).catch(function(e) {
-          btn.disabled = false;
-          btn.textContent = '上傳並取得 AI 分析';
           showToast(String(e && e.message || e || '網路錯誤，請確認 GAS_APP_URL 與 CORS'), 'error');
         });
       });
