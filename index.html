@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>倉儲巡檢系統</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --accent: #3b82f6;
+      --accent2: #10b981;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 80px;
+    }
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--card);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      display: flex;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .navbar button {
+      flex: 0 0 auto;
+      padding: 12px 16px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 15px;
+      white-space: nowrap;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+    }
+    .navbar button.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .container { padding: 16px; max-width: 600px; margin: 0 auto; }
+
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    .card h3 { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    input[type="text"], select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 8px;
+      background: rgba(0,0,0,.25);
+      color: var(--text);
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+    select { cursor: pointer; }
+
+    .photo-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .photo-box {
+      flex: 1;
+      min-width: 120px;
+      aspect-ratio: 4/3;
+      border: 2px dashed rgba(255,255,255,.2);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,.2);
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+    }
+    .photo-box img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-box .placeholder { color: var(--muted); font-size: 12px; text-align: center; padding: 8px; }
+    .photo-box input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+
+    .btn {
+      display: inline-block;
+      padding: 12px 20px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      width: 100%;
+    }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn.secondary { background: var(--card); border: 1px solid rgba(255,255,255,.2); }
+
+    .score-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-right: 8px;
+      margin-bottom: 4px;
+    }
+    .score-badge.safety { background: rgba(59,130,246,.25); color: #60a5fa; }
+    .score-badge.clean { background: rgba(16,185,129,.25); color: #34d399; }
+
+    .record-item {
+      border-left: 4px solid var(--accent);
+      padding-left: 12px;
+      margin-bottom: 16px;
+    }
+    .record-item .meta { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .record-item .feedback { font-size: 14px; line-height: 1.5; margin-top: 8px; }
+
+    .area-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .area-card {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    .area-card .area-name { font-size: 18px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+    .area-card .no-data { font-size: 12px; color: var(--muted); }
+
+    .calendar-wrap { margin-bottom: 16px; }
+    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .cal-header button { background: var(--card); border: 1px solid rgba(255,255,255,.15); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; font-size: 13px; }
+    .cal-cell { padding: 8px; border-radius: 6px; cursor: pointer; }
+    .cal-cell.other { color: var(--muted); opacity: .6; }
+    .cal-cell.has-data { background: rgba(59,130,246,.2); color: var(--accent); }
+    .cal-cell.selected { background: var(--accent); color: #fff; }
+    .cal-cell.today { border: 2px solid var(--accent2); }
+
+    .toast {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 999;
+      max-width: 90%;
+      transition: opacity .3s;
+    }
+    .toast.success { background: var(--accent2); color: #fff; }
+    .toast.error { background: var(--danger); color: #fff; }
+
+    .loading { opacity: .7; pointer-events: none; }
+    .empty { text-align: center; color: var(--muted); padding: 24px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <button type="button" data-tab="upload" class="active">上傳巡檢</button>
+    <button type="button" data-tab="areas">六區看板</button>
+    <button type="button" data-tab="list">時間列表</button>
+    <button type="button" data-tab="calendar">日曆</button>
+  </nav>
+
+  <main class="container">
+    <section id="tab-upload" class="tab-panel">
+      <div class="card">
+        <h3>本次巡檢</h3>
+        <label>廠區</label>
+        <select id="area">
+          <option value="">請選擇</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="D">D</option>
+          <option value="E">E</option>
+          <option value="F">F</option>
+        </select>
+        <label>主管姓名</label>
+        <input type="text" id="supervisor" placeholder="請輸入姓名" autocomplete="name">
+        <label>照片 1（必填）</label>
+        <div class="photo-row">
+          <div class="photo-box" data-idx="1">
+            <span class="placeholder">點擊拍照／選檔</span>
+            <img style="display:none" alt="">
+            <input type="file" accept="image/*" capture="environment" aria-label="照片1">
+          </div>
+          <div class="photo-box" data-idx="2">
+            <span class="placeholder">點擊拍照／選檔</span>
+            <img style="display:none" alt="">
+            <input type="file" accept="image/*" capture="environment" aria-label="照片2">
+          </div>
+        </div>
+        <button type="button" class="btn" id="btnUpload">上傳並取得 AI 分析</button>
+      </div>
+      <div id="uploadResult" class="card" style="display:none">
+        <h3>分析結果</h3>
+        <div id="uploadFeedback"></div>
+      </div>
+    </section>
+
+    <section id="tab-areas" class="tab-panel" style="display:none">
+      <div class="card">
+        <h3>各廠區最新回饋（依時間序）</h3>
+        <div id="areasBoard" class="area-grid"></div>
+      </div>
+    </section>
+
+    <section id="tab-list" class="tab-panel" style="display:none">
+      <div class="card">
+        <h3>全部巡檢紀錄（新→舊）</h3>
+        <div id="listRecords"></div>
+      </div>
+    </section>
+
+    <section id="tab-calendar" class="tab-panel" style="display:none">
+      <div class="card calendar-wrap">
+        <div class="cal-header">
+          <button type="button" id="calPrev">上月</button>
+          <span id="calTitle">2025-01</span>
+          <button type="button" id="calNext">下月</button>
+        </div>
+        <div id="calGrid" class="cal-grid"></div>
+      </div>
+      <div class="card">
+        <h3 id="calDateTitle">點選日期查看該日巡視紀錄</h3>
+        <div id="calDayRecords"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" style="display:none" role="alert"></div>
+
+  <script>
+    (function() {
+      // 請改為您的 GAS 網頁應用程式網址（部署後於 GAS 部署畫面取得完整 URL）
+      var GAS_APP_URL = 'https://script.google.com/macros/s/AKfycbycWtuItAvVOkVeGtURLQXZp4pjuMKE8zU_xD0-ZE0nU2doHcQeQekODicx5NOLHNnTdA/exec';
+
+      function fetchJson(url, opt) {
+        opt = opt || {};
+        return fetch(url, {
+          method: opt.method || 'GET',
+          headers: opt.headers || {},
+          body: opt.body
+        }).then(function(r) { return r.json(); });
+      }
+
+      function callUpload(data) {
+        return fetchJson(GAS_APP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+      }
+      function callGetRecords(date, limit) {
+        var q = 'action=getRecords&limit=' + (limit || 100);
+        if (date) q += '&date=' + encodeURIComponent(date);
+        return fetchJson(GAS_APP_URL + '?' + q);
+      }
+      function callGetDates(yyyy, mm) {
+        return fetchJson(GAS_APP_URL + '?action=getDates&yyyy=' + encodeURIComponent(yyyy || '') + '&mm=' + encodeURIComponent(mm || ''));
+      }
+      function callGetAreas() {
+        return fetchJson(GAS_APP_URL + '?action=getAreas');
+      }
+
+      document.querySelectorAll('.navbar button').forEach(function(b) {
+        b.addEventListener('click', function() {
+          document.querySelectorAll('.navbar button').forEach(function(x) { x.classList.remove('active'); });
+          document.querySelectorAll('.tab-panel').forEach(function(p) { p.style.display = 'none'; });
+          b.classList.add('active');
+          var id = 'tab-' + b.getAttribute('data-tab');
+          var panel = document.getElementById(id);
+          if (panel) panel.style.display = 'block';
+          if (id === 'tab-areas') loadAreas();
+          if (id === 'tab-list') loadList();
+          if (id === 'tab-calendar') renderCal();
+        });
+      });
+
+      var photos = { 1: null, 2: null };
+      document.querySelectorAll('.photo-box input').forEach(function(inp) {
+        inp.addEventListener('change', function() {
+          var f = this.files[0];
+          if (!f) return;
+          var idx = this.closest('.photo-box').getAttribute('data-idx');
+          var box = this.closest('.photo-box');
+          var img = box.querySelector('img');
+          var pl = box.querySelector('.placeholder');
+          var r = new FileReader();
+          r.onload = function() {
+            photos[idx] = r.result;
+            img.src = r.result;
+            img.style.display = 'block';
+            if (pl) pl.style.display = 'none';
+          };
+          r.readAsDataURL(f);
+        });
+      });
+
+      document.getElementById('btnUpload').addEventListener('click', function() {
+        var area = document.getElementById('area').value;
+        var supervisor = document.getElementById('supervisor').value.trim();
+        if (!area || !supervisor) { showToast('請選擇廠區並填寫主管姓名', 'error'); return; }
+        if (!photos[1] || !photos[2]) { showToast('請上傳 2 張照片', 'error'); return; }
+        if (!GAS_APP_URL || GAS_APP_URL.indexOf('XXXXXXXX') >= 0) { showToast('請先在 index.html 中設定 GAS_APP_URL', 'error'); return; }
+
+        var btn = this;
+        btn.disabled = true;
+        btn.textContent = '分析中…';
+        document.getElementById('uploadResult').style.display = 'none';
+
+        callUpload({ area: area, supervisor: supervisor, photo1Base64: photos[1], photo2Base64: photos[2] }).then(function(res) {
+          btn.disabled = false;
+          btn.textContent = '上傳並取得 AI 分析';
+          if (res.success) {
+            var html = '';
+            html += '<div class="score-badge safety">環境安全度 ' + (res.safetyScore != null ? res.safetyScore : '–') + '</div>';
+            html += '<div class="score-badge clean">環境清潔度 ' + (res.cleanlinessScore != null ? res.cleanlinessScore : '–') + '</div>';
+            html += '<div class="record-item"><div class="feedback">' + (res.feedback || res.summary || '').replace(/\n/g, '<br>') + '</div></div>';
+            document.getElementById('uploadFeedback').innerHTML = html;
+            document.getElementById('uploadResult').style.display = 'block';
+            showToast('上傳成功');
+            photos[1] = photos[2] = null;
+            document.querySelectorAll('.photo-box img').forEach(function(i) { i.src = ''; i.style.display = 'none'; });
+            document.querySelectorAll('.photo-box .placeholder').forEach(function(p) { p.style.display = 'block'; });
+            document.querySelectorAll('.photo-box input').forEach(function(i) { i.value = ''; });
+          } else {
+            showToast(res.error || '上傳失敗', 'error');
+          }
+        }).catch(function(e) {
+          btn.disabled = false;
+          btn.textContent = '上傳並取得 AI 分析';
+          showToast(String(e && e.message || e || '網路錯誤，請確認 GAS_APP_URL 與 CORS'), 'error');
+        });
+      });
+
+      function loadAreas() {
+        var el = document.getElementById('areasBoard');
+        el.innerHTML = '<div class="empty">載入中…</div>';
+        if (!GAS_APP_URL || GAS_APP_URL.indexOf('XXXXXXXX') >= 0) { el.innerHTML = '<div class="empty">請先設定 GAS_APP_URL</div>'; return; }
+        callGetRecords(null, 200).then(function(rows) {
+          var byArea = {};
+          'ABCDEF'.split('').forEach(function(a) { byArea[a] = []; });
+          (rows || []).forEach(function(r) { if (byArea[r.area]) byArea[r.area].push(r); });
+          var html = '';
+          'ABCDEF'.split('').forEach(function(a) {
+            var arr = byArea[a] || [];
+            var last = arr[0];
+            html += '<div class="area-card"><div class="area-name">廠區 ' + a + '</div>';
+            if (!last) html += '<div class="no-data">尚無回饋</div>';
+            else {
+              html += '<span class="score-badge safety">' + (last.safetyScore != null ? last.safetyScore : '–') + '</span>';
+              html += '<span class="score-badge clean">' + (last.cleanlinessScore != null ? last.cleanlinessScore : '–') + '</span>';
+              html += '<div class="record-item"><div class="meta">' + (last.dateStr || '') + ' ' + (last.timeStr || '') + ' ' + (last.supervisor || '') + '</div>';
+              html += '<div class="feedback">' + (last.summary || last.fullFeedback || '').substring(0, 120) + ((last.summary || last.fullFeedback || '').length > 120 ? '…' : '') + '</div></div>';
+            }
+            html += '</div>';
+          });
+          el.innerHTML = html;
+        }).catch(function() { el.innerHTML = '<div class="empty">無法載入，請確認 GAS_APP_URL</div>'; });
+      }
+
+      function loadList() {
+        var el = document.getElementById('listRecords');
+        el.innerHTML = '<div class="empty">載入中…</div>';
+        if (!GAS_APP_URL || GAS_APP_URL.indexOf('XXXXXXXX') >= 0) { el.innerHTML = '<div class="empty">請先設定 GAS_APP_URL</div>'; return; }
+        callGetRecords(null, 100).then(function(rows) {
+          if (!rows || !rows.length) { el.innerHTML = '<div class="empty">尚無紀錄</div>'; return; }
+          el.innerHTML = rows.map(function(r) {
+            var s = '<div class="record-item">';
+            s += '<div class="meta">' + (r.dateStr || '') + ' ' + (r.timeStr || '') + '｜' + (r.supervisor || '') + '｜廠區 ' + (r.area || '') + '</div>';
+            s += '<span class="score-badge safety">安全 ' + (r.safetyScore != null ? r.safetyScore : '–') + '</span>';
+            s += '<span class="score-badge clean">清潔 ' + (r.cleanlinessScore != null ? r.cleanlinessScore : '–') + '</span>';
+            s += '<div class="feedback">' + (r.summary || r.fullFeedback || '').replace(/\n/g, '<br>') + '</div></div>';
+            return s;
+          }).join('');
+        }).catch(function() { el.innerHTML = '<div class="empty">無法載入，請確認 GAS_APP_URL</div>'; });
+      }
+
+      var calY = new Date().getFullYear(), calM = new Date().getMonth();
+      var selectedDate = null;
+      var datesWithData = [];
+
+      function renderCal() {
+        document.getElementById('calTitle').textContent = calY + '-' + String(calM + 1).padStart(2, '0');
+        if (!GAS_APP_URL || GAS_APP_URL.indexOf('XXXXXXXX') >= 0) {
+          document.getElementById('calGrid').innerHTML = '<div class="empty" style="grid-column:1/-1">請先設定 GAS_APP_URL</div>';
+          return;
+        }
+        callGetDates(String(calY), String(calM + 1)).then(function(dates) {
+          datesWithData = dates || [];
+          var first = new Date(calY, calM, 1);
+          var last = new Date(calY, calM + 1, 0);
+          var start = first.getDay();
+          var days = last.getDate();
+          var prev = new Date(calY, calM, 0).getDate();
+          var html = [];
+          ['日', '一', '二', '三', '四', '五', '六'].forEach(function(d) { html.push('<div style="padding:4px;color:var(--muted)">' + d + '</div>'); });
+          var i, d, cls;
+          for (i = 0; i < start; i++) {
+            d = prev - start + i + 1;
+            html.push('<div class="cal-cell other">' + d + '</div>');
+          }
+          for (i = 1; i <= days; i++) {
+            cls = 'cal-cell';
+            var dt = calY + '-' + String(calM + 1).padStart(2, '0') + '-' + String(i).padStart(2, '0');
+            if (datesWithData.indexOf(dt) >= 0) cls += ' has-data';
+            var today = new Date();
+            if (calY === today.getFullYear() && calM === today.getMonth() && i === today.getDate()) cls += ' today';
+            if (selectedDate === dt) cls += ' selected';
+            html.push('<div class="' + cls + '" data-date="' + dt + '">' + i + '</div>');
+          }
+          var rest = 42 - (html.length - 7);
+          for (i = 1; i <= rest; i++) html.push('<div class="cal-cell other">' + i + '</div>');
+          document.getElementById('calGrid').innerHTML = html.slice(0, 7 + 42).join('');
+
+          document.querySelectorAll('#calGrid .cal-cell[data-date]').forEach(function(c) {
+            c.addEventListener('click', function() {
+              selectedDate = this.getAttribute('data-date');
+              document.getElementById('calDateTitle').textContent = selectedDate + ' 巡視紀錄';
+              renderCal();
+              loadDayRecords(selectedDate);
+            });
+          });
+        });
+      }
+
+      document.getElementById('calPrev').addEventListener('click', function() {
+        calM--; if (calM < 0) { calM = 11; calY--; } renderCal();
+      });
+      document.getElementById('calNext').addEventListener('click', function() {
+        calM++; if (calM > 11) { calM = 0; calY++; } renderCal();
+      });
+
+      function loadDayRecords(dateStr) {
+        var el = document.getElementById('calDayRecords');
+        el.innerHTML = '<div class="empty">載入中…</div>';
+        callGetRecords(dateStr, 50).then(function(rows) {
+          if (!rows || !rows.length) { el.innerHTML = '<div class="empty">當日尚無巡視紀錄</div>'; return; }
+          el.innerHTML = rows.map(function(r) {
+            var s = '<div class="record-item">';
+            s += '<div class="meta">' + (r.timeStr || '') + '｜' + (r.supervisor || '') + '｜廠區 ' + (r.area || '') + '</div>';
+            s += '<span class="score-badge safety">' + (r.safetyScore != null ? r.safetyScore : '–') + '</span>';
+            s += '<span class="score-badge clean">' + (r.cleanlinessScore != null ? r.cleanlinessScore : '–') + '</span>';
+            s += '<div class="feedback">' + (r.summary || r.fullFeedback || '').replace(/\n/g, '<br>') + '</div></div>';
+            return s;
+          }).join('');
+        }).catch(function() { el.innerHTML = '<div class="empty">無法載入</div>'; });
+      }
+
+      function showToast(msg, type) {
+        var t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast ' + (type === 'error' ? 'error' : 'success');
+        t.style.display = 'block';
+        clearTimeout(window._toastT);
+        window._toastT = setTimeout(function() { t.style.display = 'none'; }, 3000);
+      }
+    })();
+  </script>
+</body>
+</html>
