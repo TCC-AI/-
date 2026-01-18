@@ -137,7 +137,11 @@
       flex-direction: column;
       align-items: center;
       gap: 12px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.2s;
     }
+    .area-card:hover { opacity: 0.9; transform: translateY(-2px); }
+    .area-card:active { transform: translateY(0); }
     .area-card-content { width: 100%; }
     .area-card-thumb {
       width: 80px;
@@ -490,10 +494,12 @@
           'ABCDEF'.split('').forEach(function(a) { byArea[a] = []; });
           (rows || []).forEach(function(r) { if (byArea[r.area]) byArea[r.area].push(r); });
           var html = '';
+          var areaRecords = {}; // 儲存每個廠區的最新紀錄，用於點擊事件
           'ABCDEF'.split('').forEach(function(a) {
             var arr = byArea[a] || [];
             var last = arr[0];
-            html += '<div class="area-card">';
+            if (last) areaRecords[a] = last; // 儲存最新紀錄
+            html += '<div class="area-card" data-area="' + a + '">';
             // 處理縮圖
             if (last && last.photo1Url) {
               // 將 Google Drive 編輯 URL 轉換為圖片預覽 URL
@@ -553,6 +559,16 @@
             html += '</div></div>';
           });
           el.innerHTML = html;
+          
+          // 為每個有資料的卡片添加點擊事件
+          document.querySelectorAll('#areasBoard .area-card').forEach(function(card) {
+            var area = card.getAttribute('data-area');
+            if (areaRecords[area]) {
+              card.addEventListener('click', function() {
+                showRecordModal(areaRecords[area]);
+              });
+            }
+          });
         }).catch(function() { el.innerHTML = '<div class="empty">無法載入，請確認 GAS_APP_URL</div>'; });
       }
 
