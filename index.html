@@ -130,6 +130,18 @@
       border-radius: 10px;
       padding: 12px;
       border: 1px solid rgba(255,255,255,.06);
+      display: flex;
+      gap: 12px;
+    }
+    .area-card-content { flex: 1; }
+    .area-card-thumb {
+      width: 60px;
+      height: 60px;
+      min-width: 60px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid rgba(255,255,255,.1);
+      background: rgba(0,0,0,.2);
     }
     .area-card .area-name { font-size: 18px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
     .area-card .no-data { font-size: 12px; color: var(--muted); }
@@ -358,7 +370,13 @@
           'ABCDEF'.split('').forEach(function(a) {
             var arr = byArea[a] || [];
             var last = arr[0];
-            html += '<div class="area-card"><div class="area-name">廠區 ' + a + '</div>';
+            html += '<div class="area-card">';
+            if (last && last.photo1Url) {
+              html += '<img class="area-card-thumb" src="' + last.photo1Url + '" alt="廠區 ' + a + '" />';
+            } else {
+              html += '<div class="area-card-thumb" style="background: rgba(0,0,0,.2); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 24px;">' + a + '</div>';
+            }
+            html += '<div class="area-card-content"><div class="area-name">廠區 ' + a + '</div>';
             if (!last) html += '<div class="no-data">尚無回饋</div>';
             else {
               html += '<span class="score-badge safety">' + (last.safetyScore != null ? last.safetyScore : '–') + '</span>';
@@ -366,7 +384,7 @@
               html += '<div class="record-item"><div class="meta">' + (last.dateStr || '') + ' ' + (last.timeStr || '') + ' ' + (last.supervisor || '') + '</div>';
               html += '<div class="feedback">' + (last.summary || last.fullFeedback || '').substring(0, 120) + ((last.summary || last.fullFeedback || '').length > 120 ? '…' : '') + '</div></div>';
             }
-            html += '</div>';
+            html += '</div></div>';
           });
           el.innerHTML = html;
         }).catch(function() { el.innerHTML = '<div class="empty">無法載入，請確認 GAS_APP_URL</div>'; });
