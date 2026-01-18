@@ -120,7 +120,10 @@
       border-left: 4px solid var(--accent);
       padding-left: 12px;
       margin-bottom: 16px;
+      cursor: pointer;
+      transition: opacity 0.2s;
     }
+    .record-item:hover { opacity: 0.8; }
     .record-item .meta { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
     .record-item .feedback { font-size: 14px; line-height: 1.5; margin-top: 8px; }
 
@@ -188,6 +191,100 @@
 
     .loading { opacity: .7; pointer-events: none; }
     .empty { text-align: center; color: var(--muted); padding: 24px; font-size: 14px; }
+
+    /* 浮動視窗（Modal）樣式 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-content {
+      background: var(--card);
+      border-radius: 12px;
+      max-width: 800px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      position: relative;
+      border: 1px solid rgba(255,255,255,.1);
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      background: var(--card);
+      z-index: 10;
+    }
+    .modal-header h3 {
+      font-size: 18px;
+      color: var(--text);
+      margin: 0;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+    .modal-close:hover { background: rgba(255,255,255,.1); color: var(--text); }
+    .modal-body {
+      padding: 20px;
+    }
+    .modal-images {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .modal-image {
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.1);
+    }
+    .modal-image img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .modal-scores {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .modal-info {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .modal-feedback {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
@@ -266,6 +363,17 @@
   </main>
 
   <div id="toast" class="toast" style="display:none" role="alert"></div>
+
+  <!-- 浮動視窗（Modal） -->
+  <div id="recordModal" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">巡視紀錄詳情</h3>
+        <button type="button" class="modal-close" aria-label="關閉">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
 
   <script>
     (function() {
@@ -525,15 +633,104 @@
         el.innerHTML = '<div class="empty">載入中…</div>';
         callGetRecords(dateStr, 50).then(function(rows) {
           if (!rows || !rows.length) { el.innerHTML = '<div class="empty">當日尚無巡視紀錄</div>'; return; }
-          el.innerHTML = rows.map(function(r) {
-            var s = '<div class="record-item">';
+          el.innerHTML = rows.map(function(r, idx) {
+            var s = '<div class="record-item" data-record-index="' + idx + '">';
             s += '<div class="meta">' + (r.timeStr || '') + '｜' + (r.supervisor || '') + '｜廠區 ' + (r.area || '') + '</div>';
-            s += '<span class="score-badge safety">' + (r.safetyScore != null ? r.safetyScore : '–') + '</span>';
-            s += '<span class="score-badge clean">' + (r.cleanlinessScore != null ? r.cleanlinessScore : '–') + '</span>';
-            s += '<div class="feedback">' + (r.summary || r.fullFeedback || '').replace(/\n/g, '<br>') + '</div></div>';
+            s += '<span class="score-badge safety">安全 ' + (r.safetyScore != null ? r.safetyScore : '–') + '</span>';
+            s += '<span class="score-badge clean">清潔 ' + (r.cleanlinessScore != null ? r.cleanlinessScore : '–') + '</span>';
+            s += '<div class="feedback">' + (r.summary || r.fullFeedback || '').substring(0, 120) + ((r.summary || r.fullFeedback || '').length > 120 ? '…' : '') + '</div></div>';
             return s;
           }).join('');
+          
+          // 為每個紀錄項目添加點擊事件
+          document.querySelectorAll('#calDayRecords .record-item').forEach(function(item, idx) {
+            item.addEventListener('click', function() {
+              showRecordModal(rows[idx]);
+            });
+          });
         }).catch(function() { el.innerHTML = '<div class="empty">無法載入</div>'; });
+      }
+
+      function showRecordModal(record) {
+        var modal = document.getElementById('recordModal');
+        var modalTitle = document.getElementById('modalTitle');
+        var modalBody = document.getElementById('modalBody');
+        
+        // 設置標題
+        var dateTimeStr = '';
+        if (record.dateStr && record.timeStr) {
+          var datePart = String(record.dateStr).substring(0, 10).replace(/-/g, '/');
+          var timePart = String(record.timeStr).substring(0, 5);
+          dateTimeStr = datePart + ' ' + timePart;
+        }
+        modalTitle.textContent = '廠區 ' + (record.area || '') + ' 巡視紀錄' + (dateTimeStr ? ' - ' + dateTimeStr : '');
+        
+        // 處理圖片 URL
+        function getImageUrl(url) {
+          if (!url) return null;
+          var fileId = null;
+          var match1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+          if (match1 && match1[1]) {
+            fileId = match1[1];
+          } else {
+            var match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
+            if (match2 && match2[1]) {
+              fileId = match2[1];
+            } else {
+              var match3 = url.match(/[a-zA-Z0-9_-]{25,33}/);
+              if (match3) fileId = match3[0];
+            }
+          }
+          return fileId ? 'https://drive.google.com/uc?export=view&id=' + fileId : url;
+        }
+        
+        // 生成內容 HTML
+        var html = '';
+        
+        // 圖片區域
+        html += '<div class="modal-images">';
+        var img1Url = getImageUrl(record.photo1Url);
+        var img2Url = getImageUrl(record.photo2Url);
+        if (img1Url) {
+          html += '<div class="modal-image"><img src="' + img1Url + '" alt="照片1" /></div>';
+        }
+        if (img2Url) {
+          html += '<div class="modal-image"><img src="' + img2Url + '" alt="照片2" /></div>';
+        }
+        if (!img1Url && !img2Url) {
+          html += '<div class="empty" style="grid-column: 1/-1;">無照片</div>';
+        }
+        html += '</div>';
+        
+        // 分數
+        html += '<div class="modal-scores">';
+        html += '<span class="score-badge safety">安全 ' + (record.safetyScore != null ? record.safetyScore : '–') + '</span>';
+        html += '<span class="score-badge clean">清潔 ' + (record.cleanlinessScore != null ? record.cleanlinessScore : '–') + '</span>';
+        html += '</div>';
+        
+        // 資訊
+        html += '<div class="modal-info">';
+        html += '日期：' + (dateTimeStr || record.dateStr || '–') + '<br>';
+        html += '主管：' + (record.supervisor || '–') + '<br>';
+        html += '廠區：' + (record.area || '–');
+        html += '</div>';
+        
+        // 完整回饋
+        var feedback = record.fullFeedback || record.summary || '';
+        html += '<div class="modal-feedback">' + feedback.replace(/\n/g, '<br>') + '</div>';
+        
+        modalBody.innerHTML = html;
+        modal.classList.add('active');
+        
+        // 點擊背景或關閉按鈕關閉視窗
+        document.querySelector('#recordModal .modal-close').onclick = function() {
+          modal.classList.remove('active');
+        };
+        modal.onclick = function(e) {
+          if (e.target === modal) {
+            modal.classList.remove('active');
+          }
+        };
       }
 
       function showToast(msg, type) {
