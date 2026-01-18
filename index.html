@@ -288,42 +288,62 @@
       line-height: 1.8;
       color: var(--text);
     }
-    /* Markdown 樣式 */
+    /* Markdown 樣式 - 更明顯的格式差異 */
     .markdown-content {
-      font-size: 14px;
-      line-height: 1.8;
+      font-size: 15px;
+      line-height: 2;
       color: var(--text);
     }
     .markdown-content h1,
     .markdown-content h2,
     .markdown-content h3,
     .markdown-content h4 {
-      color: var(--text);
-      margin-top: 1.2em;
-      margin-bottom: 0.6em;
+      color: #60a5fa;
+      margin-top: 1.5em;
+      margin-bottom: 0.8em;
       font-weight: 700;
     }
-    .markdown-content h1 { font-size: 1.5em; border-bottom: 2px solid rgba(255,255,255,.1); padding-bottom: 0.3em; }
-    .markdown-content h2 { font-size: 1.3em; }
-    .markdown-content h3 { font-size: 1.1em; }
-    .markdown-content h4 { font-size: 1em; }
+    .markdown-content h1 { 
+      font-size: 1.8em; 
+      border-bottom: 3px solid #3b82f6; 
+      padding-bottom: 0.5em;
+      color: #93c5fd;
+    }
+    .markdown-content h2 { 
+      font-size: 1.5em; 
+      color: #60a5fa;
+      border-bottom: 2px solid rgba(59,130,246,0.3);
+      padding-bottom: 0.3em;
+    }
+    .markdown-content h3 { 
+      font-size: 1.3em; 
+      color: #7dd3fc;
+    }
+    .markdown-content h4 { 
+      font-size: 1.15em; 
+      color: #93c5fd;
+    }
     .markdown-content p {
-      margin: 0.8em 0;
+      margin: 1.2em 0;
+      padding: 0.5em 0;
     }
     .markdown-content ul,
     .markdown-content ol {
-      margin: 0.8em 0;
-      padding-left: 1.5em;
+      margin: 1.2em 0;
+      padding-left: 2em;
     }
     .markdown-content li {
-      margin: 0.4em 0;
+      margin: 0.8em 0;
+      line-height: 1.8;
     }
     .markdown-content strong {
       font-weight: 700;
-      color: var(--accent);
+      color: #60a5fa;
+      font-size: 1.05em;
     }
     .markdown-content em {
       font-style: italic;
+      color: #93c5fd;
     }
     .markdown-content code {
       background: rgba(0,0,0,.3);
@@ -829,18 +849,31 @@
         html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
         
         // 段落處理（將連續的換行轉換為段落）
-        html = html.split('\n\n').map(function(para) {
-          para = para.trim();
-          if (!para) return '';
-          // 如果已經是 HTML 標籤，不包裝
-          if (para.match(/^<(h[1-6]|ul|ol|pre|blockquote|hr)/)) {
-            return para;
-          }
-          return '<p>' + para + '</p>';
-        }).join('\n');
+        // 先處理空行分隔的段落
+        var paragraphs = html.split(/\n\n+/);
+        var processedParagraphs = [];
         
-        // 單個換行轉為 <br>
-        html = html.replace(/\n/g, '<br>');
+        for (var p = 0; p < paragraphs.length; p++) {
+          var para = paragraphs[p].trim();
+          if (!para) continue;
+          
+          // 如果已經是 HTML 標籤（標題、列表、代碼等），直接使用
+          if (para.match(/^<(h[1-6]|ul|ol|pre|blockquote|hr|li)/)) {
+            processedParagraphs.push(para);
+          } else {
+            // 否則包裝成段落，並保留單個換行為 <br>
+            para = para.replace(/\n/g, '<br>');
+            processedParagraphs.push('<p>' + para + '</p>');
+          }
+        }
+        
+        html = processedParagraphs.join('\n\n');
+        
+        // 自動識別並格式化數字編號列表（如「1) 項目」或「一、項目」）
+        html = html.replace(/(\d+)[\.\)、]\s*([^\n<]+)/g, '<strong style="color: #60a5fa;">$1)</strong> $2');
+        
+        // 自動識別並格式化中文編號（如「一、」「二、」）
+        html = html.replace(/([一二三四五六七八九十]+)[、．]\s*([^\n<]+)/g, '<strong style="color: #60a5fa;">$1、</strong> $2');
         
         return html;
       }
