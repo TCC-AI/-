@@ -390,9 +390,26 @@
             if (last && last.photo1Url) {
               // 將 Google Drive 編輯 URL 轉換為圖片預覽 URL
               var imgUrl = last.photo1Url;
-              var match = imgUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-              if (match && match[1]) {
-                imgUrl = 'https://drive.google.com/uc?export=view&id=' + match[1];
+              var fileId = null;
+              // 嘗試多種 Google Drive URL 格式提取文件 ID
+              var match1 = imgUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+              if (match1 && match1[1]) {
+                fileId = match1[1];
+              } else {
+                var match2 = imgUrl.match(/id=([a-zA-Z0-9_-]+)/);
+                if (match2 && match2[1]) {
+                  fileId = match2[1];
+                } else {
+                  // 嘗試提取長度 25-33 的字元串（Google Drive ID 的常見長度）
+                  var match3 = imgUrl.match(/[a-zA-Z0-9_-]{25,33}/);
+                  if (match3) {
+                    fileId = match3[0];
+                  }
+                }
+              }
+              if (fileId) {
+                // 使用 thumbnail API 獲取縮圖（更可靠）
+                imgUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w200';
               }
               html += '<img class="area-card-thumb" src="' + imgUrl + '" alt="廠區 ' + a + '" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\'" />';
               html += '<div class="area-card-thumb-placeholder" style="display: none;">' + a + '</div>';
@@ -402,9 +419,27 @@
             html += '<div class="area-card-content"><div class="area-name">廠區 ' + a + '</div>';
             if (!last) html += '<div class="no-data">尚無回饋</div>';
             else {
-              html += '<span class="score-badge safety">' + (last.safetyScore != null ? last.safetyScore : '–') + '</span>';
-              html += '<span class="score-badge clean">' + (last.cleanlinessScore != null ? last.cleanlinessScore : '–') + '</span>';
-              html += '<div class="record-item"><div class="meta">' + (last.dateStr || '') + ' ' + (last.timeStr || '') + ' ' + (last.supervisor || '') + '</div>';
+              // 格式化時間：yyyy/mm/dd hh:mm
+              var dateTimeStr = '';
+              if (last.dateStr && last.timeStr) {
+                var datePart = String(last.dateStr).substring(0, 10).replace(/-/g, '/');
+                var timePart = String(last.timeStr).substring(0, 5); // 只取 HH:mm
+                dateTimeStr = datePart + ' ' + timePart;
+              } else if (last.timestamp) {
+                // 如果只有 timestamp，格式化它
+                var dt = new Date(last.timestamp);
+                if (!isNaN(dt.getTime())) {
+                  var y = dt.getFullYear();
+                  var m = String(dt.getMonth() + 1).padStart(2, '0');
+                  var d = String(dt.getDate()).padStart(2, '0');
+                  var h = String(dt.getHours()).padStart(2, '0');
+                  var min = String(dt.getMinutes()).padStart(2, '0');
+                  dateTimeStr = y + '/' + m + '/' + d + ' ' + h + ':' + min;
+                }
+              }
+              html += '<span class="score-badge safety">安全 ' + (last.safetyScore != null ? last.safetyScore : '–') + '</span>';
+              html += '<span class="score-badge clean">清潔 ' + (last.cleanlinessScore != null ? last.cleanlinessScore : '–') + '</span>';
+              html += '<div class="record-item"><div class="meta">' + dateTimeStr + (last.supervisor ? ' ' + last.supervisor : '') + '</div>';
               html += '<div class="feedback">' + (last.summary || last.fullFeedback || '').substring(0, 120) + ((last.summary || last.fullFeedback || '').length > 120 ? '…' : '') + '</div></div>';
             }
             html += '</div></div>';
