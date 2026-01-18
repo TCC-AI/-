@@ -324,8 +324,15 @@
       color: #93c5fd;
     }
     .markdown-content p {
-      margin: 1.2em 0;
-      padding: 0.5em 0;
+      margin: 1.5em 0;
+      padding: 0.8em 0;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    .markdown-content p:last-child {
+      border-bottom: none;
+    }
+    .markdown-content p:first-child {
+      margin-top: 0.5em;
     }
     .markdown-content ul,
     .markdown-content ol {
@@ -763,11 +770,12 @@
         }).catch(function() { el.innerHTML = '<div class="empty">無法載入</div>'; });
       }
 
-      // Markdown 轉 HTML 函數
+      // 智能文字格式化函數（增強版：自動識別結構並格式化）
       function markdownToHtml(text) {
         if (!text) return '';
         var html = String(text);
         
+        // 首先處理標準 Markdown 語法
         // 代碼塊 (```code```)
         html = html.replace(/```([\s\S]*?)```/g, function(match, code) {
           return '<pre><code>' + escapeHtml(code.trim()) + '</code></pre>';
@@ -776,80 +784,45 @@
         // 行內代碼 (`code`)
         html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
         
-        // 標題 (# ## ### ####)
+        // 標準 Markdown 粗體 (**text** 或 __text__)
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+        
+        // 標準 Markdown 標題
         html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
         html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
         html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
         html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
         
-        // 粗體 (**text** 或 __text__)
-        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+        // 智能段落分段：根據句號、問號、驚嘆號分段（保留原本的換行邏輯）
+        // 先處理有明顯段落分隔的情況（雙換行）
+        var hasDoubleNewline = /\n\n/.test(html);
         
-        // 斜體 (*text* 或 _text_)
-        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-        html = html.replace(/_(.+?)_/g, '<em>$1</em>');
-        
-        // 分隔線 (--- 或 ***)
-        html = html.replace(/^---$/gm, '<hr>');
-        html = html.replace(/^\*\*\*$/gm, '<hr>');
-        
-        // 引用 (> text)
-        html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
-        
-        // 列表處理（先處理有序列表，再處理無序列表）
-        // 有序列表 (1. item)
-        var lines = html.split('\n');
-        var inOrderedList = false;
-        var inUnorderedList = false;
-        var processedLines = [];
-        
-        for (var i = 0; i < lines.length; i++) {
-          var line = lines[i];
-          var orderedMatch = line.match(/^(\d+)\. (.+)$/);
-          var unorderedMatch = line.match(/^[\*\-\+] (.+)$/);
-          
-          if (orderedMatch) {
-            if (!inOrderedList) {
-              if (inUnorderedList) {
-                processedLines.push('</ul>');
-                inUnorderedList = false;
-              }
-              processedLines.push('<ol>');
-              inOrderedList = true;
-            }
-            processedLines.push('<li>' + orderedMatch[2] + '</li>');
-          } else if (unorderedMatch) {
-            if (!inUnorderedList) {
-              if (inOrderedList) {
-                processedLines.push('</ol>');
-                inOrderedList = false;
-              }
-              processedLines.push('<ul>');
-              inUnorderedList = true;
-            }
-            processedLines.push('<li>' + unorderedMatch[1] + '</li>');
-          } else {
-            if (inOrderedList) {
-              processedLines.push('</ol>');
-              inOrderedList = false;
-            }
-            if (inUnorderedList) {
-              processedLines.push('</ul>');
-              inUnorderedList = false;
-            }
-            processedLines.push(line);
-          }
+        if (!hasDoubleNewline) {
+          // 如果沒有雙換行，則根據標點符號智能分段
+          // 將句號、問號、驚嘆號後的空白替換為特殊標記
+          html = html.replace(/([。！？\?\!])\s*/g, '$1\n\n');
         }
-        if (inOrderedList) processedLines.push('</ol>');
-        if (inUnorderedList) processedLines.push('</ul>');
-        html = processedLines.join('\n');
         
-        // 連結 ([text](url))
-        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+        // 自動識別並加粗關鍵詞
+        var keywords = [
+          '建議', '需要', '必須', '應', '應', '注意', '警告', '危險', 
+          '建議', '應確保', '應清理', '應檢查', '應整理',
+          '可能', '構成', '影響', '風險', '安全', '清潔',
+          '消防', '逃生', '通道', '設備', '電線', '整理'
+        ];
+        keywords.forEach(function(keyword) {
+          var regex = new RegExp('(' + keyword + ')', 'g');
+          html = html.replace(regex, '<strong style="color: #60a5fa; font-weight: 700;">$1</strong>');
+        });
         
-        // 段落處理（將連續的換行轉換為段落）
-        // 先處理空行分隔的段落
+        // 自動識別數字編號（如「1) 項目」或「一、項目」）
+        html = html.replace(/(\d+)[\.\)、]\s+([^\n<]+)/g, '<strong style="color: #60a5fa;">$1)</strong> $2');
+        
+        // 自動識別中文編號（如「一、」「二、」）
+        html = html.replace(/([一二三四五六七八九十]+)[、．]\s*([^\n<]+)/g, '<strong style="color: #60a5fa;">$1、</strong> $2');
+        
+        // 段落處理：將連續的換行轉換為段落
         var paragraphs = html.split(/\n\n+/);
         var processedParagraphs = [];
         
@@ -861,19 +834,14 @@
           if (para.match(/^<(h[1-6]|ul|ol|pre|blockquote|hr|li)/)) {
             processedParagraphs.push(para);
           } else {
-            // 否則包裝成段落，並保留單個換行為 <br>
-            para = para.replace(/\n/g, '<br>');
+            // 否則包裝成段落
+            // 清理多餘的換行，但保留單個換行作為 <br>
+            para = para.replace(/\n+/g, ' '); // 先合併多個換行
             processedParagraphs.push('<p>' + para + '</p>');
           }
         }
         
         html = processedParagraphs.join('\n\n');
-        
-        // 自動識別並格式化數字編號列表（如「1) 項目」或「一、項目」）
-        html = html.replace(/(\d+)[\.\)、]\s*([^\n<]+)/g, '<strong style="color: #60a5fa;">$1)</strong> $2');
-        
-        // 自動識別並格式化中文編號（如「一、」「二、」）
-        html = html.replace(/([一二三四五六七八九十]+)[、．]\s*([^\n<]+)/g, '<strong style="color: #60a5fa;">$1、</strong> $2');
         
         return html;
       }
