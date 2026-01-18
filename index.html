@@ -285,9 +285,85 @@
     }
     .modal-feedback {
       font-size: 14px;
-      line-height: 1.6;
+      line-height: 1.8;
       color: var(--text);
-      white-space: pre-wrap;
+    }
+    /* Markdown 樣式 */
+    .markdown-content {
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--text);
+    }
+    .markdown-content h1,
+    .markdown-content h2,
+    .markdown-content h3,
+    .markdown-content h4 {
+      color: var(--text);
+      margin-top: 1.2em;
+      margin-bottom: 0.6em;
+      font-weight: 700;
+    }
+    .markdown-content h1 { font-size: 1.5em; border-bottom: 2px solid rgba(255,255,255,.1); padding-bottom: 0.3em; }
+    .markdown-content h2 { font-size: 1.3em; }
+    .markdown-content h3 { font-size: 1.1em; }
+    .markdown-content h4 { font-size: 1em; }
+    .markdown-content p {
+      margin: 0.8em 0;
+    }
+    .markdown-content ul,
+    .markdown-content ol {
+      margin: 0.8em 0;
+      padding-left: 1.5em;
+    }
+    .markdown-content li {
+      margin: 0.4em 0;
+    }
+    .markdown-content strong {
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .markdown-content em {
+      font-style: italic;
+    }
+    .markdown-content code {
+      background: rgba(0,0,0,.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--accent2);
+    }
+    .markdown-content pre {
+      background: rgba(0,0,0,.3);
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 1em 0;
+      border-left: 3px solid var(--accent);
+    }
+    .markdown-content pre code {
+      background: none;
+      padding: 0;
+      color: var(--text);
+    }
+    .markdown-content blockquote {
+      border-left: 3px solid var(--accent);
+      padding-left: 1em;
+      margin: 1em 0;
+      color: var(--muted);
+      font-style: italic;
+    }
+    .markdown-content hr {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,.1);
+      margin: 1.5em 0;
+    }
+    .markdown-content a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .markdown-content a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
@@ -667,6 +743,114 @@
         }).catch(function() { el.innerHTML = '<div class="empty">無法載入</div>'; });
       }
 
+      // Markdown 轉 HTML 函數
+      function markdownToHtml(text) {
+        if (!text) return '';
+        var html = String(text);
+        
+        // 代碼塊 (```code```)
+        html = html.replace(/```([\s\S]*?)```/g, function(match, code) {
+          return '<pre><code>' + escapeHtml(code.trim()) + '</code></pre>';
+        });
+        
+        // 行內代碼 (`code`)
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+        
+        // 標題 (# ## ### ####)
+        html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
+        html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+        html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+        html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+        
+        // 粗體 (**text** 或 __text__)
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+        
+        // 斜體 (*text* 或 _text_)
+        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+        
+        // 分隔線 (--- 或 ***)
+        html = html.replace(/^---$/gm, '<hr>');
+        html = html.replace(/^\*\*\*$/gm, '<hr>');
+        
+        // 引用 (> text)
+        html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+        
+        // 列表處理（先處理有序列表，再處理無序列表）
+        // 有序列表 (1. item)
+        var lines = html.split('\n');
+        var inOrderedList = false;
+        var inUnorderedList = false;
+        var processedLines = [];
+        
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          var orderedMatch = line.match(/^(\d+)\. (.+)$/);
+          var unorderedMatch = line.match(/^[\*\-\+] (.+)$/);
+          
+          if (orderedMatch) {
+            if (!inOrderedList) {
+              if (inUnorderedList) {
+                processedLines.push('</ul>');
+                inUnorderedList = false;
+              }
+              processedLines.push('<ol>');
+              inOrderedList = true;
+            }
+            processedLines.push('<li>' + orderedMatch[2] + '</li>');
+          } else if (unorderedMatch) {
+            if (!inUnorderedList) {
+              if (inOrderedList) {
+                processedLines.push('</ol>');
+                inOrderedList = false;
+              }
+              processedLines.push('<ul>');
+              inUnorderedList = true;
+            }
+            processedLines.push('<li>' + unorderedMatch[1] + '</li>');
+          } else {
+            if (inOrderedList) {
+              processedLines.push('</ol>');
+              inOrderedList = false;
+            }
+            if (inUnorderedList) {
+              processedLines.push('</ul>');
+              inUnorderedList = false;
+            }
+            processedLines.push(line);
+          }
+        }
+        if (inOrderedList) processedLines.push('</ol>');
+        if (inUnorderedList) processedLines.push('</ul>');
+        html = processedLines.join('\n');
+        
+        // 連結 ([text](url))
+        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+        
+        // 段落處理（將連續的換行轉換為段落）
+        html = html.split('\n\n').map(function(para) {
+          para = para.trim();
+          if (!para) return '';
+          // 如果已經是 HTML 標籤，不包裝
+          if (para.match(/^<(h[1-6]|ul|ol|pre|blockquote|hr)/)) {
+            return para;
+          }
+          return '<p>' + para + '</p>';
+        }).join('\n');
+        
+        // 單個換行轉為 <br>
+        html = html.replace(/\n/g, '<br>');
+        
+        return html;
+      }
+      
+      function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
       function showRecordModal(record) {
         var modal = document.getElementById('recordModal');
         var modalTitle = document.getElementById('modalTitle');
@@ -739,9 +923,9 @@
         html += '廠區：' + (record.area || '–');
         html += '</div>';
         
-        // 完整回饋
+        // 完整回饋（使用 Markdown 格式化）
         var feedback = record.fullFeedback || record.summary || '';
-        html += '<div class="modal-feedback">' + feedback.replace(/\n/g, '<br>') + '</div>';
+        html += '<div class="modal-feedback markdown-content">' + markdownToHtml(feedback) + '</div>';
         
         modalBody.innerHTML = html;
         modal.classList.add('active');
