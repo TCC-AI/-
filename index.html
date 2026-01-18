@@ -665,10 +665,11 @@
         }
         modalTitle.textContent = '廠區 ' + (record.area || '') + ' 巡視紀錄' + (dateTimeStr ? ' - ' + dateTimeStr : '');
         
-        // 處理圖片 URL
+        // 處理圖片 URL（與六區看板使用相同邏輯）
         function getImageUrl(url) {
           if (!url) return null;
           var fileId = null;
+          // 嘗試多種 Google Drive URL 格式提取文件 ID
           var match1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
           if (match1 && match1[1]) {
             fileId = match1[1];
@@ -677,11 +678,18 @@
             if (match2 && match2[1]) {
               fileId = match2[1];
             } else {
+              // 嘗試提取長度 25-33 的字元串（Google Drive ID 的常見長度）
               var match3 = url.match(/[a-zA-Z0-9_-]{25,33}/);
-              if (match3) fileId = match3[0];
+              if (match3) {
+                fileId = match3[0];
+              }
             }
           }
-          return fileId ? 'https://drive.google.com/uc?export=view&id=' + fileId : url;
+          if (fileId) {
+            // 使用 thumbnail API 獲取圖片（更可靠），w800 用於浮動視窗較大的顯示
+            return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800';
+          }
+          return url;
         }
         
         // 生成內容 HTML
@@ -692,10 +700,10 @@
         var img1Url = getImageUrl(record.photo1Url);
         var img2Url = getImageUrl(record.photo2Url);
         if (img1Url) {
-          html += '<div class="modal-image"><img src="' + img1Url + '" alt="照片1" /></div>';
+          html += '<div class="modal-image"><img src="' + img1Url + '" alt="照片1" onerror="this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJyZ2JhKDAsMCwwLDAuMikiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIxNCIgZmlsbD0idmFyKC0tbXV0ZWQpIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+圖片載入失敗</text></svg>\';" /></div>';
         }
         if (img2Url) {
-          html += '<div class="modal-image"><img src="' + img2Url + '" alt="照片2" /></div>';
+          html += '<div class="modal-image"><img src="' + img2Url + '" alt="照片2" onerror="this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJyZ2JhKDAsMCwwLDAuMikiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIxNCIgZmlsbD0idmFyKC0tbXV0ZWQpIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+圖片載入失敗</text></svg>\';" /></div>';
         }
         if (!img1Url && !img2Url) {
           html += '<div class="empty" style="grid-column: 1/-1;">無照片</div>';
